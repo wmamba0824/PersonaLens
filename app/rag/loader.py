@@ -10,29 +10,58 @@ from app.config.settings import DATA_FILE, EMBEDDINGS_FILE, TRANSCRIPT_DIR, XUEQ
 
 
 LOGGER = logging.getLogger(__name__)
+KNOWLEDGE_SUFFIXES = {".txt", ".md", ".markdown"}
+MARKDOWN_SUFFIXES = {".md", ".markdown"}
+
+
+def is_knowledge_file(path, root):
+    """Discover text safely; keep hidden files and Markdown instructions out."""
+    relative = path.relative_to(root)
+    if any(part.startswith(".") for part in relative.parts):
+        return False
+    if path.suffix.lower() not in KNOWLEDGE_SUFFIXES:
+        return False
+    if path.suffix.lower() in MARKDOWN_SUFFIXES:
+        stem = path.stem.lower()
+        if stem in {"readme", "agents", "skill"} or stem.startswith("readme."):
+            return False
+    if path.is_symlink():
+        return False
+    for parent in path.parents:
+        if parent == root:
+            break
+        if parent.is_symlink():
+            return False
+    try:
+        path.resolve().relative_to(root.resolve())
+    except ValueError:
+        return False
+    return path.is_file()
 
 
 def read_txt(path):
-    """Accept common Windows TXT encodings; never replace invalid bytes silently."""
+    """Read TXT or Markdown with common Windows encodings (legacy API name)."""
     raw = path.read_bytes()
     try:
-        return raw.decode("utf-8-sig")
+        text = raw.decode("utf-8-sig")
     except UnicodeDecodeError:
         try:
-            return raw.decode("gb18030")
+            text = raw.decode("gb18030")
         except UnicodeDecodeError as exc:
-            raise ValueError(f"Cannot read TXT {path.name}; save it as UTF-8") from exc
+            raise ValueError(f"Cannot read text {path.name}; save it as UTF-8") from exc
+    return text.replace("\r\n", "\n").replace("\r", "\n")
 
 
 def knowledge_files():
     """Directory mode is isolated from legacy creator sources."""
     if DATA_FILE.is_dir():
         return sorted(
-            (path for path in DATA_FILE.rglob("*") if path.is_file()
-             and path.suffix.lower() == ".txt" and not path.is_symlink()),
+            (path for path in DATA_FILE.rglob("*") if is_knowledge_file(path, DATA_FILE)),
             key=lambda path: path.relative_to(DATA_FILE).as_posix(),
         )
-    return [DATA_FILE] if DATA_FILE.is_file() else []
+    if DATA_FILE.is_file() and DATA_FILE.suffix.lower() in KNOWLEDGE_SUFFIXES and not DATA_FILE.is_symlink():
+        return [DATA_FILE]
+    return []
 
 
 def split_txt(text, max_chars=400):
@@ -54,16 +83,21 @@ def read_entries(include_sources=False):
         origins.setdefault(text, set()).add(label)
     if DATA_FILE.is_dir():
         for path in knowledge_files():
-            label = f"TXT · {path.relative_to(DATA_FILE).as_posix()}"
+            kind = "Markdown" if path.suffix.lower() in MARKDOWN_SUFFIXES else "TXT"
+            label = f"{kind} · {path.relative_to(DATA_FILE).as_posix()}"
             for part in split_txt(read_txt(path)):
                 add_entry(part, label)
         return (entries, origins) if include_sources else entries
-    with open(DATA_FILE, "r", encoding="utf-8") as f:
-        text = f.read()
-    for raw in re.split(r"\n\s*\n", text.strip()):
+    if DATA_FILE.suffix.lower() not in KNOWLEDGE_SUFFIXES or DATA_FILE.is_symlink():
+        raise ValueError("Knowledge file must be a regular TXT or Markdown file")
+    text = read_txt(DATA_FILE)
+    markdown = DATA_FILE.suffix.lower() in MARKDOWN_SUFFIXES
+    paragraphs = split_txt(text) if markdown else re.split(r"\n\s*\n", text.strip())
+    label = f"Markdown · {DATA_FILE.name}" if markdown else f"资料 · {DATA_FILE.name}"
+    for raw in paragraphs:
         raw = raw.strip()
         if raw:
-            add_entry(raw, f"资料 · {DATA_FILE.name}")
+            add_entry(raw, label)
     for fname in ("posts.txt", "replies.txt"):
         fpath = XUEQIU_DIR / fname
         if not fpath.exists():

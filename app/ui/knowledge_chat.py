@@ -1,4 +1,4 @@
-"""Minimal TXT chat UI; no acquisition tools or creator-specific assumptions."""
+"""Local TXT/Markdown chat UI; no creator-specific assumptions."""
 
 import streamlit as st
 
@@ -57,7 +57,7 @@ def render_knowledge_chat():
         st.session_state.messages = []
     with st.sidebar:
         st.header(APP_NAME)
-        st.caption("把 TXT 放进资料目录（默认 knowledge/），然后点击重新加载。")
+        st.caption("把 TXT 或 Markdown（.md / .markdown）放进资料目录（默认 knowledge/），然后点击重新加载。")
         if st.button("重新加载资料"):
             st.cache_resource.clear()
             st.session_state.messages = []
@@ -78,7 +78,7 @@ def render_knowledge_chat():
             st.session_state.messages = []
             for key in ("style_editor", "style_draft_digest", "style_approved"):
                 st.session_state.pop(key, None)
-            st.info("检测到 TXT 变化，正在更新索引；旧对话已清空。")
+            st.info("检测到资料变化，正在更新索引；旧对话已清空。")
         st.session_state.knowledge_signature = signature
         entries = load_entries()
         with st.spinner("准备检索索引（首次需要下载本地模型，之后复用）…"):
@@ -87,7 +87,7 @@ def render_knowledge_chat():
         st.error(f"读取资料失败：{exc}")
         st.stop()
     with st.sidebar:
-        st.write(f"{len(files)} 个 TXT · {len(entries)} 个资料片段")
+        st.write(f"{len(files)} 个资料文件 · {len(entries)} 个资料片段")
         st.caption(status["message"])
         if status["mode"] == "lexical_local_error":
             st.warning(status["message"])
@@ -96,7 +96,7 @@ def render_knowledge_chat():
                 st.text(path.relative_to(DATA_FILE).as_posix() if DATA_FILE.is_dir() else path.name)
     render_style_controls(entries)
     if not entries:
-        st.info("还没有资料：把自己的 TXT 放入项目的 knowledge 文件夹，再点击“重新加载资料”。")
+        st.info("还没有资料：把自己的 TXT 或 Markdown 放入项目的 knowledge 文件夹，再点击“重新加载资料”。")
     for message in st.session_state.messages:
         with st.chat_message(message["role"]):
             st.markdown(message["content"])

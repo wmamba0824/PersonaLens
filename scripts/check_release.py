@@ -41,7 +41,7 @@ def source_paths(root):
 def audit(root=ROOT):
     root = Path(root).resolve()
     names = source_paths(root)
-    findings, total_bytes = [], 0
+    findings, total_bytes, markdown_sources = [], 0, []
     for name in names:
         path, parts = root / name, Path(name).parts
         if path.is_symlink():
@@ -53,7 +53,8 @@ def audit(root=ROOT):
         private_path = (any(part in IGNORED_DIRECTORIES | PRIVATE_DIRECTORIES for part in parts)
                         or (name not in EXAMPLE_ENVS and (path.name == ".env" or path.name.endswith(".env")))
                         or path.name == "secrets.toml" or name == "persona.md"
-                        or (parts[0] == "knowledge" and path.suffix.lower() == ".txt")
+                        or (parts[0] == "knowledge" and path.suffix.lower() in {".txt", ".md", ".markdown"}
+                            and name != "knowledge/README.md")
                         or path.suffix.lower() in {".npy", ".npz", ".bin", ".pt", ".pkl"})
         if private_path:
             findings.append({"file": name, "reason": "private data or generated artifact is a release candidate"})
@@ -67,6 +68,8 @@ def audit(root=ROOT):
         except (UnicodeError, OSError):
             findings.append({"file": name, "reason": "non-text or unreadable source"})
             continue
+        if path.suffix.lower() in {".md", ".markdown"}:
+            markdown_sources.append((name, path, content))
         for line_number, line in enumerate(content.splitlines(), 1):
             for reason, pattern in SECRET_PATTERNS.items():
                 if pattern.search(line):
@@ -78,11 +81,8 @@ def audit(root=ROOT):
             if populated:
                 findings.append({"file": name, "reason": "example contains nonempty credential", "fields": sorted(populated)})
 
-    for name in names:
-        path = root / name
-        if path.suffix.lower() != ".md" or not path.is_file() or path.is_symlink():
-            continue
-        for link in re.findall(r"\]\(([^)\s]+)\)", path.read_text(encoding="utf-8-sig")):
+    for name, path, content in markdown_sources:
+        for link in re.findall(r"\]\(([^)\s]+)\)", content):
             if "://" in link or link.startswith("#"):
                 continue
             if not (path.parent / link.split("#", 1)[0]).is_file():

@@ -83,7 +83,7 @@ def main() -> int:
         entries = read_entries()
         report("OK", f"Knowledge base contains {len(entries)} entries")
         if not entries:
-            report("WARN", "No knowledge yet. Put TXT files in knowledge/ and reload the page.")
+            report("WARN", "No knowledge yet. Put TXT or Markdown files in knowledge/ and reload the page.")
         if RETRIEVAL_BACKEND != "cloud":
             if RETRIEVAL_BACKEND == "local":
                 report("INFO", "Index is built automatically on first use; first model download requires network")

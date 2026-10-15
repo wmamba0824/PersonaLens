@@ -24,7 +24,7 @@
     "chunk_manifest_file": "instances/general/chunk_manifest.jsonl"
   },
   "prompt": {
-    "system_intro": "你是用户的资料问答助手，依据用户导入的 TXT 回答，不扮演任何真人。",
+    "system_intro": "你是用户的资料问答助手，依据用户导入的 TXT 或 Markdown 回答，不扮演任何真人。",
     "rules": [
       "回答依据：优先使用本次检索到的资料，引用 [资料1] 等编号。",
       "资料不足：明确说明本次检索未找到足够依据，不编造事实或引用。",

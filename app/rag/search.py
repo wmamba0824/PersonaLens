@@ -71,7 +71,7 @@ def init_search():
                 LOGGER.warning("Local embeddings unavailable; using keyword retrieval", exc_info=False)
                 mode, message = "lexical_local_error", "本地向量不可用：请检查模型下载/依赖；当前使用关键词检索"
         elif RETRIEVAL_BACKEND == "local":
-            mode, message = "lexical_empty", "等待添加 TXT（尚未下载或初始化模型）"
+            mode, message = "lexical_empty", "等待添加 TXT 或 Markdown（尚未下载或初始化模型）"
         _SEARCH_STATUS = {"mode": mode, "entry_count": len(entries),
                           "embedding_count": len(entries) if _LOCAL_INDEX is not None else 0, "message": message}
         return dict(_SEARCH_STATUS)

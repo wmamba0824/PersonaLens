@@ -16,7 +16,7 @@ def main():
     parser.add_argument("--execute", action="store_true", help="Download/load the public local model")
     args = parser.parse_args()
     if not args.execute:
-        print("Dry run. Add --execute to download/load the public BGE model; no chat API or user TXT is used.")
+        print("Dry run. Add --execute to download/load the public BGE model; no chat API or user documents are used.")
         return
     entries = [
         "顾客收货后七天内可以申请退货退款，商品须未使用并保留完整包装。",

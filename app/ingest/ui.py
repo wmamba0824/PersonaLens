@@ -33,7 +33,7 @@ def render_creator_workflow():
             _safe_error(exc)
     uid = st.session_state.get("creator_uid")
     if not uid:
-        st.caption("这里只解析身份；没有点击采集前，不向B站发送请求。也可切换到TXT资料问答，导入自己的内容。")
+        st.caption("这里只解析身份；没有点击采集前，不向B站发送请求。也可切换到本地资料问答，导入自己的 TXT 或 Markdown。")
         return
     try:
         store = CreatorStore(parse_creator(uid))

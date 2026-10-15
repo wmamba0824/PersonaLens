@@ -211,7 +211,7 @@ def local_model_path(store=None):
 def transcription_status(model_path=None):
     path = Path(model_path) if model_path is not None else local_model_path()
     if importlib.util.find_spec("faster_whisper") is None:
-        return False, "未安装本地转录依赖；运行 setup_video.ps1，TXT和字幕模式不受影响。"
+        return False, "未安装本地转录依赖；运行 setup_video.ps1，本地资料和字幕模式不受影响。"
     if not all((path / name).is_file() for name in MODEL_FILES):
         return False, "本地转录模型未准备；运行 setup_video.ps1 -DownloadModel，或配置 MD_WHISPER_MODEL_PATH。"
     return True, "本地转录已就绪（CPU/int8）；不调用云端语音API，不自动下载模型。"

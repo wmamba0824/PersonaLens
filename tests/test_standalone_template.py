@@ -15,7 +15,7 @@ def test_no_original_data_or_legacy_entry_is_shipped():
     ui = (ROOT / "app/ingest/ui.py").read_text(encoding="utf-8-sig")
     assert "render_existing_md" not in ui and "使用已有 MD" not in ui
     entry = (ROOT / "chat_app.py").read_text(encoding="utf-8-sig")
-    assert '["B站人物助手", "TXT 资料问答"]' in entry
+    assert '["B站人物助手", "本地资料问答"]' in entry
 
 
 def test_source_audit_reports_no_source_secrets_or_broken_links():
@@ -55,7 +55,7 @@ def test_audit_rejects_missing_documentation_link(tmp_path):
     assert release.audit(tmp_path)["findings"][0]["reason"] == "missing local link"
 
 
-def test_new_user_can_open_creator_and_empty_txt_without_network(monkeypatch):
+def test_new_user_can_open_creator_and_empty_knowledge_without_network(monkeypatch):
     from streamlit.testing.v1 import AppTest
     from streamlit.testing.v1.local_script_runner import LocalScriptRunner
     monkeypatch.setenv("MD_NETWORK_MODE", "local")
@@ -73,5 +73,5 @@ def test_new_user_can_open_creator_and_empty_txt_without_network(monkeypatch):
     assert app.sidebar.radio[0].value == "B站人物助手"
     assert any(item.label == "B站主页或UID" for item in app.text_input)
     assert not any(item.label == "人物入口" for item in app.radio)
-    app.sidebar.radio[0].set_value("TXT 资料问答").run(timeout=30)
+    app.sidebar.radio[0].set_value("本地资料问答").run(timeout=30)
     assert not app.exception and len(app.chat_input) == 1 and app.chat_input[0].disabled

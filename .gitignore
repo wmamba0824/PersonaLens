@@ -2,6 +2,11 @@ venv/
 .venv/
 knowledge/**/*.[tT][xX][tT]
 knowledge/*.[tT][xX][tT]
+knowledge/**/*.[mM][dD]
+knowledge/*.[mM][dD]
+knowledge/**/*.[mM][aA][rR][kK][dD][oO][wW][nN]
+knowledge/*.[mM][aA][rR][kK][dD][oO][wW][nN]
+!knowledge/README.md
 .env
 *.env
 __pycache__/

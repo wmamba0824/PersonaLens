@@ -64,13 +64,13 @@ if ($ForceInstall -or -not $ready -or $savedHash -ne $requirementsHash) {
     # Windows long-path support is disabled; never change the registry for users.
     $longPathsEnabled = (Get-ItemProperty -LiteralPath 'HKLM:\SYSTEM\CurrentControlSet\Control\FileSystem' -Name LongPathsEnabled -ErrorAction SilentlyContinue).LongPathsEnabled
     if ($projectRoot.Length -gt 80 -and $longPathsEnabled -ne 1) {
-        throw "This project path is too long for ONNX installation on this Windows setup. Move the clone to a shorter path such as C:\AI\PersonaLens, then rerun. No system settings, .env or TXT were changed."
+        throw "This project path is too long for ONNX installation on this Windows setup. Move the clone to a shorter path such as C:\AI\PersonaLens, then rerun. No system settings, .env or user documents were changed."
     }
     Write-Host "Installing chat dependencies (first run needs internet; optional collectors are not installed)..."
     & $venvPython -m pip install --disable-pip-version-check --upgrade "pip>=23"
     if ($LASTEXITCODE -ne 0) { throw "Cannot update pip in .venv. Check network and rerun." }
     & $venvPython -m pip install --disable-pip-version-check -r $requirementsPath
-    if ($LASTEXITCODE -ne 0) { throw "Dependency installation failed. Check PyPI network access; on Windows use a short project path such as C:\AI\PersonaLens. Rerun to retry; .env and TXT files were not overwritten." }
+    if ($LASTEXITCODE -ne 0) { throw "Dependency installation failed. Check PyPI network access; on Windows use a short project path such as C:\AI\PersonaLens. Rerun to retry; .env and user documents were not overwritten." }
     & $venvPython -m pip check
     if ($LASTEXITCODE -ne 0) { throw "Dependency compatibility check failed." }
     Set-Content -LiteralPath $markerPath -Value $requirementsHash -Encoding ascii
@@ -84,4 +84,4 @@ if (-not (Test-Path -LiteralPath $envPath)) {
     Write-Host "Created .env. Fill DEEPSEEK_API_KEY with your own key; do not share this file."
 }
 New-Item -ItemType Directory -Path (Join-Path $projectRoot "knowledge") -Force | Out-Null
-Write-Host "Environment ready. Put your TXT files in knowledge/ and start the app."
+Write-Host "Environment ready. Put your TXT or Markdown files in knowledge/ and start the app."
