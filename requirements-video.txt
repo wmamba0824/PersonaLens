@@ -1,0 +1,4 @@
+# Optional local ASR only; web chat/subtitles do not need these packages.
+faster-whisper==1.1.0; python_version < "3.9"
+ctranslate2<4.6; python_version < "3.9"
+faster-whisper>=1.1,<2; python_version >= "3.9"

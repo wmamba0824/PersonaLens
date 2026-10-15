@@ -1,0 +1,10 @@
+# Minimal local chat runtime; acquisition/transcription tools are optional.
+streamlit>=1.28,<2
+requests>=2.28,<3
+numpy>=1.21,<3
+python-dotenv>=1.0,<2
+# Local ONNX embeddings; keep a compatibility branch for existing Python 3.8/3.9.
+fastembed==0.3.6; python_version < "3.10"
+huggingface-hub<1; python_version < "3.10"
+tokenizers>=0.15,<0.20; python_version < "3.10"
+fastembed>=0.7.4,<0.9; python_version >= "3.10"
