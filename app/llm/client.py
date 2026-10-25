@@ -1,18 +1,11 @@
-"""DeepSeek streaming client."""
+"""Configurable streaming chat client; credentials are read at request time."""
 
 import json
 
 import requests
 
-from app.config.settings import (
-    DEEPSEEK_API_URL,
-    DEEPSEEK_USE_SYSTEM_PROXY,
-    MODEL,
-    required_env,
-)
-
-
-DEEPSEEK_API_KEY = required_env("DEEPSEEK_API_KEY")
+from app.config.settings import DEEPSEEK_USE_SYSTEM_PROXY
+from app.config.runtime import ConfigError, get_config
 
 
 class LLMServiceError(RuntimeError):
@@ -31,7 +24,7 @@ _SESSION = create_http_session()
 
 def _api_error(response):
     if response.status_code in (401, 403):
-        return "DeepSeek 鉴权失败，请检查 DEEPSEEK_API_KEY。"
+        return "DeepSeek 鉴权失败，请在本机网页的API设置中检查Key（或检查已有.env配置）。"
     if response.status_code == 429:
         return "DeepSeek 请求过于频繁或余额不足，请稍后再试并检查账户额度。"
     # Provider errors can echo submitted content or credentials. Never render
@@ -40,14 +33,21 @@ def _api_error(response):
 
 def stream_chat(messages):
     try:
+        config = get_config()
+    except ConfigError as exc:
+        raise LLMServiceError(str(exc)) from None
+    if not config["api_key"]:
+        raise LLMServiceError("尚未配置API Key，请在本机网页的API设置中填写。")
+    _SESSION.trust_env = config["use_system_proxy"]
+    try:
         response = _SESSION.post(
-            DEEPSEEK_API_URL,
+            config["url"],
             headers={
-                "Authorization": f"Bearer {DEEPSEEK_API_KEY}",
+                "Authorization": f"Bearer {config['api_key']}",
                 "Content-Type": "application/json",
             },
             json={
-                "model": MODEL,
+                "model": config["model"],
                 "messages": messages,
                 "temperature": 0.7,
                 "max_tokens": 2048,
@@ -58,13 +58,14 @@ def stream_chat(messages):
             },
             stream=True,
             timeout=120,
+            allow_redirects=False,
         )
     except requests.Timeout as exc:
         raise LLMServiceError("连接 DeepSeek 超时，请稍后重试。") from exc
     except requests.RequestException as exc:
         proxy_hint = (
             " 当前已启用系统代理，请检查代理是否可用。"
-            if DEEPSEEK_USE_SYSTEM_PROXY
+            if config["use_system_proxy"]
             else " 当前使用直连；如网络必须经过代理，请设置 DEEPSEEK_USE_SYSTEM_PROXY=true。"
         )
         raise LLMServiceError(f"无法连接 DeepSeek。{proxy_hint}") from exc

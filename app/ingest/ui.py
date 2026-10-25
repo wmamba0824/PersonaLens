@@ -2,13 +2,16 @@
 
 import streamlit as st
 
-from app.ingest.identity import parse_creator
+from app.ingest.identity import parse_identity
+from app.ingest.library_ui import render_library, render_document_import
+from app.ingest.exports import export_profile, export_chat
 from app.ingest.bilibili import collect_dynamics, CollectionError
 from app.ingest.video import collect_video_text, transcription_status
 from app.ingest.store import CreatorStore, BusyError
 from app.ingest.persona import generate_portrait, redact_credentials, portrait_metrics
 from app.ingest.conversation import build_index, stream_creator_response
 from app.llm.client import LLMServiceError
+from app.config.bilibili import CookieConfigError, cookie_status
 
 
 def _safe_error(exc):
@@ -20,23 +23,14 @@ def _safe_error(exc):
 
 def render_creator_workflow():
     st.title("人物风格助手")
-    st.caption("输入主页 → 文字动态 / 视频字幕与可选本地转录 → 画像审核 → 本地知识库 → 风格聊天。AI模拟，不是本人。")
+    st.caption("建立人物 → B站采集或导入TXT/MD → 画像审核 → 本地知识库 → 风格聊天。AI模拟，不是本人。")
     st.info("只处理你有权使用的公开内容；跳过转载、付费/试看和合作视频，不抓评论、不绕过平台限制。视频资料可能包含嘉宾、引用或识别错误，不自动认定每句话都出自本人。")
-    with st.form("creator_identity"):
-        link = st.text_input("B站主页或UID", placeholder="https://space.bilibili.com/数字UID")
-        opened = st.form_submit_button("打开 / 创建人物")
-    if opened:
-        try:
-            identity = parse_creator(link)
-            st.session_state.creator_uid = identity.uid
-        except ValueError as exc:
-            _safe_error(exc)
-    uid = st.session_state.get("creator_uid")
+    uid = render_library()
     if not uid:
-        st.caption("这里只解析身份；没有点击采集前，不向B站发送请求。也可切换到本地资料问答，导入自己的 TXT 或 Markdown。")
+        st.caption("可以从B站ID建立人物，也可以只用本地TXT/MD建立；没有点击采集前，不向B站发送请求。")
         return
     try:
-        store = CreatorStore(parse_creator(uid))
+        store = CreatorStore(parse_identity(uid))
         data = store.read()
     except (ValueError, OSError) as exc:
         _safe_error(exc)
@@ -45,16 +39,31 @@ def render_creator_workflow():
                  data.get("profile", {}).get("approved"))
     if st.session_state.get("creator_chat_signature") != signature:
         st.session_state.creator_chat_signature = signature
-        st.session_state.creator_messages = []
+        st.session_state.creator_messages = store.load_messages(data) if store.profile_fresh(data) else []
         st.session_state.pop("creator_index", None)
         st.session_state.pop("creator_index_status", None)
-    st.subheader(f"{data['name']} · UID {uid}")
-    st.caption(f"资料与画像独立保存在 .runtime/creators/bilibili_{uid}/；切换人物会清空本页旧对话。")
+    st.subheader(data['name'] + (" · 本地人物" if uid.startswith("local_") else f" · UID {uid}"))
+    st.caption(f"资料、画像和最近对话保存在 .runtime/creators/{store.path.name}/；不同人物互相隔离。")
     job = data.get("job", {})
     if job.get("status") in {"running", "failed"}:
         st.warning(f"上次任务：{job.get('stage')} / {job.get('status')}。已保存的阶段保留；不会自动重试付费请求。")
 
     st.markdown("### 1. 采集并预览")
+    render_document_import(store)
+    if not uid.startswith("local_"):
+        render_bilibili_collection(store, uid)
+    render_portrait_and_chat(store, uid)
+
+
+def render_bilibili_collection(store, uid):
+    try:
+        login = cookie_status()
+        if login["configured"]["SESSDATA"]:
+            st.caption("B站登录Cookie已填写，未验证是否有效；网页配置可即时复用，平台仍可能拒绝请求。")
+        else:
+            st.info("未填写SESSDATA，当前按匿名采集。可在侧栏“B站采集设置”填写自己的登录态；也可直接导入TXT/MD，不需要B站登录。")
+    except CookieConfigError as exc:
+        st.warning(str(exc))
     limit = st.slider("本次最多采集本人文字条数", 5, 100, 30, 5, key="creator_limit")
     pages = st.slider("最多请求页数", 1, 5, 3, key="creator_pages")
     rights = st.checkbox("我有权使用这些内容；同意在上述范围内向B站发起采集请求。", key="creator_rights_" + uid)
@@ -95,8 +104,11 @@ def render_creator_workflow():
                 st.rerun()
             except (CollectionError, ValueError, BusyError, OSError) as exc:
                 _safe_error(exc)
+
+
+def render_portrait_and_chat(store, uid):
     data = store.read()
-    st.write(f"累计 {len(data['records'])} 条账号资料（不代表完整历史；每个视频只计一条）")
+    st.write(f"累计 {len(data['records'])} 份人物资料（不代表完整历史；每个视频/导入文件只计一份）")
     for account, summary in data.get("linked_sources", {}).get("wechat", {}).items():
         st.caption(f"已关联公众号「{account}」：{summary['accepted']}篇 / {summary['chars']}字；同一人物关系由用户确认，不是平台官方认证。")
     if data.get("collection", {}).get("warning"):
@@ -115,7 +127,10 @@ def render_creator_workflow():
                 st.caption(f"{record.get('title', '')} · {record['source_type']} · {record.get('sample_range', '')}")
                 st.caption(record.get("uncertainty", "") + record.get("speaker_note", ""))
             st.text(record["text"])
-            st.link_button("查看公众号原文" if record.get("source_type") == "wechat_article" else "查看B站原文", record["url"])
+            if record.get("source_file"):
+                st.caption("来源文件：" + record["source_file"])
+            if record.get("url"):
+                st.link_button("查看公众号原文" if record.get("source_type") == "wechat_article" else "查看B站原文", record["url"])
 
     st.markdown("### 2. 生成与审核人物画像")
     usable_records, usable_chars = portrait_metrics(data)
@@ -146,7 +161,10 @@ def render_creator_workflow():
             for number, chunk in enumerate(profile["evidence"], 1):
                 st.caption(f"[样本{number}] {chunk['date']}")
                 st.text(chunk["text"])
-                st.link_button("样本原文", chunk["url"])
+                if chunk.get("url"):
+                    st.link_button("样本原文", chunk["url"])
+                elif chunk.get("source_file"):
+                    st.caption("来源文件：" + chunk["source_file"])
         reviewed = st.checkbox("我已核对画像，确认它仅是基于资料的AI模拟，不代表本人。", key="creator_reviewed_" + uid + profile['revision'])
         if st.button("确认画像，准备知识库", disabled=not reviewed or not edited.strip(), key="creator_approve"):
             try:
@@ -155,6 +173,9 @@ def render_creator_workflow():
             except (ValueError, BusyError, OSError) as exc:
                 _safe_error(exc)
     data = store.read()
+    if data.get("profile"):
+        st.download_button("导出人物画像", export_profile(data), file_name="persona_profile.md", mime="text/markdown")
+        st.caption("导出包含画像文字，请自行确认可以分享；不打包原文库或API配置。")
     ready = store.profile_fresh(data) and data["profile"].get("approved") is True
     if not ready:
         st.caption("完成画像审核后，才会开放人物聊天。")
@@ -185,7 +206,7 @@ def render_person_chat(store, data):
     signature = (store.path.name, data["corpus_digest"], data["profile"]["revision"])
     if st.session_state.get("person_chat_signature") != signature:
         st.session_state.person_chat_signature = signature
-        st.session_state.creator_messages = []
+        st.session_state.creator_messages = store.load_messages(data)
         st.session_state.pop("creator_index", None)
         st.session_state.pop("creator_index_status", None)
     st.markdown("### 人物知识库与聊天")
@@ -204,9 +225,14 @@ def render_person_chat(store, data):
         st.rerun()
     st.caption("问题、人物画像、最近对话和最多6,000字检索片段会发送给聊天API并消耗额度。资料文件与索引留在电脑，不是完全离线AI。")
     st.caption("画像只用于表达风格；回答应分开标注资料依据和AI推演。引用编号会校验，具体内容仍需核对原文。")
+    st.caption("最近10轮对话自动保存在本机，可从“我的人物”继续；资料/画像变化后不会混用旧对话。")
     if st.button("清空人物对话", key="creator_clear"):
-        st.session_state.creator_messages = []
-        st.rerun()
+        try:
+            store.save_messages(data, [])
+            st.session_state.creator_messages = []
+            st.rerun()
+        except (OSError, ValueError, BusyError) as exc:
+            _safe_error(exc)
     messages = st.session_state.get("creator_messages", [])
     for message in messages:
         with st.chat_message(message["role"]):
@@ -239,7 +265,14 @@ def render_person_chat(store, data):
                 {"role": "user", "content": question},
                 {"role": "assistant", "content": answer, "sources": metadata.get("sources", []),
                  "prompt_version": metadata.get("prompt_version")}])[-20:]
+            try:
+                store.save_messages(data, st.session_state.creator_messages)
+            except (OSError, ValueError, BusyError):
+                st.warning("本轮回答已显示，但本机对话保存失败；未重试API，请检查人物是否正在更新。")
         except (ValueError, LLMServiceError, OSError) as exc:
             if placeholder is not None:
                 placeholder.empty()
             _safe_error(exc)
+    current_messages = st.session_state.get("creator_messages", [])
+    if current_messages:
+        st.download_button("导出当前对话", export_chat(data, current_messages), file_name="persona_chat.md", mime="text/markdown")

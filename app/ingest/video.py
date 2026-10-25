@@ -22,6 +22,7 @@ import requests
 
 from app.ingest.bilibili import CollectionError
 from app.ingest.process import run_bounded, ProcessCleanupError
+from app.config.bilibili import apply_api_cookies, refusal_message
 
 
 BV = re.compile(r"BV[0-9A-Za-z]{10}\Z")
@@ -42,17 +43,17 @@ def _session(auth=False):
     session = requests.Session()
     session.trust_env = False
     if auth:
-        for env, name in (("BILI_SESSDATA", "SESSDATA"), ("BILI_JCT", "bili_jct"),
-                          ("BUVID3", "buvid3"), ("DEDEUSERID", "DedeUserID")):
-            value = os.getenv(env)
-            if value:
-                session.cookies.set(name, value, domain="api.bilibili.com", secure=True)
+        try:
+            apply_api_cookies(session)
+        except ValueError:
+            session.close()
+            raise
     return session
 
 
 def _bytes(response, limit, deadline):
     if response.status_code != 200:
-        raise CollectionError(f"B站返回HTTP {response.status_code}；已停止，不重试或绕过限制。")
+        raise CollectionError(refusal_message(response.status_code))
     length = response.headers.get("Content-Length", "")
     if length.isdigit() and int(length) > limit:
         raise CollectionError("平台文件超过本次大小上限，已跳过。")

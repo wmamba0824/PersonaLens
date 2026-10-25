@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import os
+import argparse
 import sys
 from pathlib import Path
 
@@ -18,6 +19,9 @@ def report(level: str, message: str) -> None:
 
 
 def main() -> int:
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--allow-unconfigured", action="store_true", help="Allow first-use web configuration")
+    args = parser.parse_args()
     load_dotenv(PROJECT_ROOT / ".env", encoding="utf-8-sig")
     errors = 0
 
@@ -61,12 +65,18 @@ def main() -> int:
             report("ERROR", f"Missing {path}")
             errors += 1
 
-    for name in ("DEEPSEEK_API_KEY",):
-        if os.getenv(name):
-            report("OK", f"Environment variable {name} is configured")
-        else:
-            report("ERROR", f"Environment variable {name} is missing. Fill it in .env and restart.")
-            errors += 1
+    from app.config.runtime import get_config, ConfigError
+    try:
+        configured = bool(get_config()["api_key"])
+    except ConfigError:
+        configured = False
+    if configured:
+        report("OK", "Chat API is configured (key not displayed)")
+    elif args.allow_unconfigured:
+        report("WARN", "Configure API in the local web setup page; startup is allowed")
+    else:
+        report("ERROR", "Chat API is not configured. Use start_local.bat and complete web setup.")
+        errors += 1
 
     if RETRIEVAL_BACKEND == "local":
         report("INFO", f"Local retrieval: {LOCAL_EMBEDDING_MODEL}; no embedding API key needed")

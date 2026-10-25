@@ -7,6 +7,7 @@ import re
 import streamlit as st
 
 from app.config.settings import DATA_FILE, EMBEDDINGS_FILE, TRANSCRIPT_DIR, XUEQIU_DIR
+from app.rag.chunking import document_chunks
 
 
 LOGGER = logging.getLogger(__name__)
@@ -65,12 +66,8 @@ def knowledge_files():
 
 
 def split_txt(text, max_chars=400):
-    for paragraph in re.split(r"\n\s*\n", text.strip()):
-        paragraph = paragraph.strip()
-        for start in range(0, len(paragraph), max_chars):
-            part = paragraph[start:start + max_chars].strip()
-            if part:
-                yield part
+    for chunk in document_chunks(text, max_chars=max_chars):
+        yield chunk["text"]
 
 
 def read_entries(include_sources=False):

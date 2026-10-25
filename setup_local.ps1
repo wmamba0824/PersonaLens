@@ -81,7 +81,7 @@ if ($ForceInstall -or -not $ready -or $savedHash -ne $requirementsHash) {
 $envPath = Join-Path $projectRoot ".env"
 if (-not (Test-Path -LiteralPath $envPath)) {
     Copy-Item -LiteralPath (Join-Path $projectRoot ".env.example") -Destination $envPath
-    Write-Host "Created .env. Fill DEEPSEEK_API_KEY with your own key; do not share this file."
+    Write-Host "Created optional .env. You can configure your own API Key on the first-use local web page."
 }
 New-Item -ItemType Directory -Path (Join-Path $projectRoot "knowledge") -Force | Out-Null
-Write-Host "Environment ready. Put your TXT or Markdown files in knowledge/ and start the app."
+Write-Host "Environment ready. Start the app, configure API in the browser, then create a person or import TXT/Markdown."

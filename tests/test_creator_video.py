@@ -383,7 +383,7 @@ def test_web_video_flow_consent_approval_chat_refresh_and_creator_isolation(tmp_
                 runner._script_thread.join(timeout=3)
     monkeypatch.setattr(LocalScriptRunner, "run", joined)
     app = AppTest.from_file(str(Path(__file__).resolve().parents[1] / "chat_app.py")).run(timeout=25)
-    app.sidebar.radio[0].set_value("B站人物助手").run(timeout=25)
+    app.sidebar.radio[0].set_value("人物助手").run(timeout=25)
     def button(label):
         return next(widget for widget in app.button if widget.label == label)
     def check(fragment):

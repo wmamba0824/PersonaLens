@@ -35,10 +35,10 @@ def test_mixed_files_keep_markdown_text_sources_and_chunk_limits(knowledge):
     entries, origins = loader.read_entries(include_sources=True)
     assert len(loader.knowledge_files()) == 4
     assert all(0 < len(entry) <= 400 for entry in entries)
-    assert "# 蓝鲸计划" in entries and "- 先验证需求\n- 再开发" in entries
-    assert "```python\nraise RuntimeError('text only')\n```" in entries
-    assert "[来源](https://example.invalid/no-fetch)" in entries
-    assert origins["# 蓝鲸计划"] == {"Markdown · notes.MD"}
+    assert "# 蓝鲸计划\n- 先验证需求\n- 再开发" in entries
+    assert "# 蓝鲸计划\n```python\nraise RuntimeError('text only')\n```" in entries
+    assert "# 蓝鲸计划\n[来源](https://example.invalid/no-fetch)" in entries
+    assert origins["# 蓝鲸计划\n- 先验证需求\n- 再开发"] == {"Markdown · notes.MD"}
     assert origins["TXT已有能力保留"] == {"TXT · plain.TXT"}
     assert "Markdown · nested/long.MarkDown" in loader.source_label("长文" * 200)
 
@@ -46,7 +46,7 @@ def test_mixed_files_keep_markdown_text_sources_and_chunk_limits(knowledge):
 @pytest.mark.parametrize("encoding", ["utf-8", "utf-8-sig", "gb18030"])
 def test_markdown_accepts_common_text_encodings(knowledge, encoding):
     (knowledge / "笔记.md").write_bytes("# 中文标题\n\n有效资料".encode(encoding))
-    assert loader.read_entries() == ["# 中文标题", "有效资料"]
+    assert loader.read_entries() == ["# 中文标题\n有效资料"]
 
 
 def test_invalid_text_has_actionable_error(knowledge):
@@ -88,8 +88,8 @@ def test_single_configured_markdown_file_uses_same_decoder(tmp_path, monkeypatch
     monkeypatch.setattr(loader, "XUEQIU_DIR", tmp_path / "absent-secondary")
     monkeypatch.setattr(loader, "TRANSCRIPT_DIR", tmp_path / "absent-transcripts")
     assert loader.knowledge_files() == [path]
-    assert loader.read_entries() == ["# 单文件", "资料"]
-    assert loader.read_entries(include_sources=True)[1]["资料"] == {"Markdown · single.markdown"}
+    assert loader.read_entries() == ["# 单文件\n资料"]
+    assert loader.read_entries(include_sources=True)[1]["# 单文件\n资料"] == {"Markdown · single.markdown"}
 
 
 def test_discovery_refuses_resolved_outside_path_without_symlink_privileges(knowledge, tmp_path, monkeypatch):
@@ -123,7 +123,7 @@ def test_markdown_changes_reuse_local_vectors_and_invalidate_approved_style(know
 
     monkeypatch.setattr(style, "profile_path", lambda: tmp_path / "style.json")
     path = knowledge / "notes.md"
-    path.write_text("# 蓝鲸\n\n先验证需求", encoding="utf-8")
+    path.write_text("保持不变的介绍\n\n# 蓝鲸\n\n先验证需求", encoding="utf-8")
     entries = loader.read_entries()
     index_path = tmp_path / "index.npz"
     factory = lambda name: Encoder()
@@ -140,7 +140,7 @@ def test_markdown_changes_reuse_local_vectors_and_invalidate_approved_style(know
     style.save_style(entries, draft, enabled=True)
     assert draft in style.approved_style(entries)
 
-    path.write_text("# 蓝鲸\n\n先找三个用户验证需求", encoding="utf-8")
+    path.write_text("保持不变的介绍\n\n# 蓝鲸\n\n先找三个用户验证需求", encoding="utf-8")
     updated = loader.read_entries()
     second = local_index.LocalIndex(updated, index_path, model_factory=factory)
     assert second.stats["generated"] == 1 and second.stats["reused"] == 1

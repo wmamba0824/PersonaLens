@@ -152,7 +152,7 @@ def test_web_bad_reference_removed_without_retry_then_good_answer_saved(approved
     monkeypatch.setattr(LocalScriptRunner, "run", joined)
     before = (approved_creator.path / "snapshot.json").read_bytes()
     app = AppTest.from_file(str(Path(__file__).resolve().parents[1] / "chat_app.py")).run(timeout=20)
-    app.sidebar.radio[0].set_value("B站人物助手").run(timeout=20)
+    app.sidebar.radio[0].set_value("人物助手").run(timeout=20)
     app.text_input[0].set_value("123")
     next(item for item in app.button if item.label == "打开 / 创建人物").click().run(timeout=20)
     next(item for item in app.checkbox if "同意提问" in item.label).check().run(timeout=20)

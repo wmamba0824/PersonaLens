@@ -7,6 +7,9 @@ knowledge/*.[mM][dD]
 knowledge/**/*.[mM][aA][rR][kK][dD][oO][wW][nN]
 knowledge/*.[mM][aA][rR][kK][dD][oO][wW][nN]
 !knowledge/README.md
+!.streamlit/
+.streamlit/*
+!.streamlit/config.toml
 .env
 *.env
 __pycache__/

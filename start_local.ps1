@@ -60,7 +60,7 @@ function Read-PidRecord {
 }
 
 Write-Host "Checking local environment..."
-& $pythonExecutable "scripts/doctor.py"
+& $pythonExecutable "scripts/doctor.py" --allow-unconfigured
 if ($LASTEXITCODE -ne 0) {
     throw "Readiness check failed. Fix the errors above and run this script again."
 }

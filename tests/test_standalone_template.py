@@ -15,7 +15,7 @@ def test_no_original_data_or_legacy_entry_is_shipped():
     ui = (ROOT / "app/ingest/ui.py").read_text(encoding="utf-8-sig")
     assert "render_existing_md" not in ui and "使用已有 MD" not in ui
     entry = (ROOT / "chat_app.py").read_text(encoding="utf-8-sig")
-    assert '["B站人物助手", "本地资料问答"]' in entry
+    assert '["人物助手", "本地资料问答"]' in entry
 
 
 def test_source_audit_reports_no_source_secrets_or_broken_links():
@@ -70,7 +70,7 @@ def test_new_user_can_open_creator_and_empty_knowledge_without_network(monkeypat
     monkeypatch.setattr(LocalScriptRunner, "run", joined)
     app = AppTest.from_file(str(ROOT / "chat_app.py")).run(timeout=30)
     assert not app.exception
-    assert app.sidebar.radio[0].value == "B站人物助手"
+    assert app.sidebar.radio[0].value == "人物助手"
     assert any(item.label == "B站主页或UID" for item in app.text_input)
     assert not any(item.label == "人物入口" for item in app.radio)
     app.sidebar.radio[0].set_value("本地资料问答").run(timeout=30)

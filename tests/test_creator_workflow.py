@@ -264,7 +264,7 @@ def test_web_creation_review_chat_switch_and_refresh_without_real_api(tmp_path, 
     root = Path(__file__).resolve().parents[1]
     at = AppTest.from_file(str(root / "chat_app.py")).run(timeout=20)
     assert not at.exception
-    at.sidebar.radio[0].set_value("B站人物助手").run(timeout=20)
+    at.sidebar.radio[0].set_value("人物助手").run(timeout=20)
     assert not at.exception and not acquisitions and not model_calls
     def button(label):
         return next(item for item in at.button if item.label == label)

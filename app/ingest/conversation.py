@@ -7,7 +7,7 @@ from app.rag.search import _lexical_search
 from app.ingest.persona import chunks_for, redact_credentials, source_note
 
 
-CREATOR_PROMPT_VERSION = "creator-grounding-v2"
+CREATOR_PROMPT_VERSION = "creator-grounding-v3"
 
 
 def build_index(store, data, model_factory=None):
@@ -35,12 +35,26 @@ def prepare_creator_context(data, query, index=None):
     lookup = {}
     for chunk in chunks:
         lookup.setdefault(chunk["text"], chunk)
+    selected = [lookup[text] for _, text in hits if text in lookup]
+    # Main hits first, then at most two adjacent chunks from the same source/heading.
+    by_id = {chunk["id"]: position for position, chunk in enumerate(chunks)}
+    selected_ids = {chunk["id"] for chunk in selected}
+    neighbors = []
+    for chunk in selected:
+        position = by_id[chunk["id"]]
+        for neighbor in chunks[max(0, position - 1):position + 2]:
+            if (len(neighbors) < 2 and neighbor["id"] not in selected_ids
+                    and neighbor["id"] not in {item["id"] for item in neighbors}
+                    and neighbor["record_id"] == chunk["record_id"] and neighbor["heading"] == chunk["heading"]):
+                neighbors.append(neighbor)
     blocks, sources, seen = [], [], set()
-    for _, text in hits:
+    for chunk in selected + neighbors:
+        if len(sources) >= 8:
+            break
+        text = chunk["text"]
         if text in seen:
             continue
         seen.add(text)
-        chunk = lookup[text]
         number = len(blocks) + 1
         origin = chunk["url"] or chunk.get("source_file")
         block = f"【资料{number}】{chunk['date']}\n来源：{origin}{source_note(chunk)}\n{text}"
@@ -54,7 +68,8 @@ def prepare_creator_context(data, query, index=None):
 def build_creator_system_prompt(data, context):
     """Separate evidence from explanation without rewriting the approved portrait."""
     portrait_label = "已审核启用的机器画像（不代表作者本人确认）"
-    return f"""你是基于B站账号{data['uid']}及用户确认关联来源的历史内容的AI人物风格助手，不是本人，也不代表其当前观点。
+    identity = ("人物“" + data["name"] + "”" if str(data["uid"]).startswith("local_") else "B站账号" + data["uid"])
+    return f"""你是基于{identity}及用户确认关联来源的历史内容的AI人物风格助手，不是本人，也不代表其当前观点。
 规则版本：{CREATOR_PROMPT_VERSION}
 
 ## 资料依据与AI推演必须分开

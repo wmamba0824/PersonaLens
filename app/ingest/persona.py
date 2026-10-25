@@ -3,7 +3,9 @@
 import os
 import re
 
-from app.rag.loader import split_txt
+from app.rag.chunking import document_chunks
+from app.config.runtime import redact
+from app.config.bilibili import redact_cookies
 from app.ingest.store import digest
 
 
@@ -23,18 +25,20 @@ def redact_credentials(text):
         value = os.getenv(name, "")
         if len(value) >= 8:
             text = text.replace(value, "[凭据已隐藏]")
-    return text
+    return redact_cookies(redact(text))
 
 
 def chunks_for(data):
     chunks = []
     for record in data["records"]:
-        for part, text in enumerate(split_txt(record["text"]), 1):
+        for part, section in enumerate(document_chunks(record["text"]), 1):
+            text = section["text"]
             date_match = re.match(r"\[(\d{4}-\d{2}-\d{2})", text)
             provenance = {key: record[key] for key in ("source_type", "bvid", "cid", "title", "sample_range",
                 "uncertainty", "speaker_note", "sample_complete", "source_platform", "account_name", "article_id",
                 "identity_link", "byline", "date_source") if key in record}
-            chunks.append({"id": record["id"] + ":" + str(part), "text": text, **provenance,
+            chunks.append({"id": record["id"] + ":" + str(part), "record_id": record["id"],
+                           "heading": section["heading"], "text": text, **provenance,
                            "url": record["url"], "source_file": record.get("source_file", ""),
                            "date": date_match[1] if date_match else record["published_at"],
                            "author": record["author_name"] or data["name"]})
@@ -44,6 +48,8 @@ def chunks_for(data):
 def source_note(chunk):
     if not chunk.get("source_type"):
         return ""
+    if chunk["source_type"] in {"local_txt", "local_markdown"}:
+        return f"\n来源类型：本地原文；文件：{chunk.get('source_file', '')}。" + chunk.get("uncertainty", "")
     if chunk["source_type"] == "wechat_article":
         return (f"\n来源类型：公众号原文；账号：{chunk.get('account_name', '')}；标题：{chunk.get('title', '')}。"
                 + chunk.get("uncertainty", "") + chunk.get("speaker_note", ""))

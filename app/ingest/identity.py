@@ -18,6 +18,26 @@ class CreatorIdentity:
         return "https://space.bilibili.com/" + self.uid
 
 
+@dataclass(frozen=True)
+class LocalIdentity:
+    uid: str
+
+    @property
+    def key(self):
+        return self.uid
+
+    @property
+    def url(self):
+        return ""
+
+
+def parse_identity(value):
+    value = str(value).strip()
+    if re.fullmatch(r"local_[0-9a-f]{32}", value):
+        return LocalIdentity(value)
+    return parse_creator(value)
+
+
 def parse_creator(value):
     value = str(value).strip()
     if re.fullmatch(r"[1-9][0-9]{0,18}", value):

@@ -4,13 +4,13 @@ No paid posts, comments, downloads, redirects, CAPTCHA workarounds or retries.
 """
 
 from datetime import datetime, timezone, timedelta
-import os
 import time
 
 import requests
 
 from app.ingest.identity import parse_creator
 from app.ingest.text import extract_dynamic_text
+from app.config.bilibili import apply_api_cookies, refusal_message
 
 
 class CollectionError(RuntimeError):
@@ -58,11 +58,11 @@ def collect_dynamics(identity, max_items=30, max_pages=3, session=None, progress
     session = session or requests.Session()
     if owned:
         session.trust_env = False
-        for env_name, cookie_name in (("BILI_SESSDATA", "SESSDATA"), ("BILI_JCT", "bili_jct"),
-                                      ("BUVID3", "buvid3"), ("DEDEUSERID", "DedeUserID")):
-            value = os.getenv(env_name)
-            if value:
-                session.cookies.set(cookie_name, value, domain="api.bilibili.com", secure=True)
+        try:
+            apply_api_cookies(session)
+        except ValueError:
+            session.close()
+            raise
     records, seen, offset, offsets, skipped = [], set(), "", set(), 0
     complete, warning = False, ""
     started = time.monotonic()
@@ -80,7 +80,7 @@ def collect_dynamics(identity, max_items=30, max_pages=3, session=None, progress
                     timeout=(5, 15), allow_redirects=False)
                 try:
                     if response.status_code != 200:
-                        raise CollectionError(f"B站返回HTTP {response.status_code}。可能需要登录或遇到平台限制；没有重试或绕过。")
+                        raise CollectionError(refusal_message(response.status_code))
                     payload = response.json()
                 finally:
                     response.close()

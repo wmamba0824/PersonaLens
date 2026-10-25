@@ -5,3 +5,7 @@ backgroundColor = "#05080f"
 secondaryBackgroundColor = "#0a1428"
 textColor = "#e2e8f0"
 font = "sans serif"
+
+[server]
+# Enforce the same per-file bound before Python reads uploaded documents.
+maxUploadSize = 2
